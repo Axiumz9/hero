@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="app.title">ما تُرِكَ وراءنا — خريطة النظام الشمسي</title>
+<style>
+  :root{
+    --bg:#05070f; --panel:#0d1224; --panel-2:#131a30;
+    --accent:#4da3ff; --accent-2:#7c5cff; --gold:#ffcf5c;
+    --text:#e8ecf5; --muted:#8b93a8; --border:#1f2a44;
+    --teal:#2aa198; --teal-light:#8ad4ce;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+    background:#05070f;color:var(--text);
+    min-height:100vh;overflow:hidden;
+    transition: direction 0.2s;
+  }
+  html[lang="en"] body{font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+
+  /* ============ زر اللغة في شاشة الترحيب ============ */
+  #welcome-lang{
+    position:fixed;top:22px;left:22px;z-index:101;
+    display:flex;align-items:center;gap:8px;
+    padding:12px 20px;border-radius:14px;
+    background:linear-gradient(160deg,rgba(20,28,56,.85),rgba(10,14,30,.85));
+    border:1px solid rgba(77,163,255,.35);
+    color:var(--text);font-family:inherit;font-size:.92rem;font-weight:700;
+    cursor:pointer;backdrop-filter:blur(14px);transition:.25s;
+    box-shadow:0 8px 30px rgba(0,0,0,.5), 0 0 24px rgba(77,163,255,.12);
+    letter-spacing:.3px;
+  }
+  #welcome-lang:hover{
+    border-color:var(--accent);transform:translateY(-2px);
+    box-shadow:0 14px 40px rgba(0,0,0,.65), 0 0 40px rgba(77,163,255,.4);
+  }
+  #welcome-lang .wl-icon{font-size:1.15rem;line-height:1}
+  #welcome-lang .wl-label{color:var(--accent)}
+  html[lang="en"] #welcome-lang{left:auto;right:22px}
+
+  #welcome{
+    position:fixed;inset:0;z-index:100;
+    display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(ellipse at 50% 40%, #14204a 0%, #070b16 55%, #03040a 100%),
+      radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 80% 20%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 60% 70%, #fff, transparent),
+      radial-gradient(1px 1px at 30% 80%, #fff, transparent),
+      radial-gradient(1px 1px at 90% 60%, #fff, transparent);
+    background-size:100% 100%, 200px 200px, 300px 300px, 250px 250px, 350px 350px, 280px 280px;
+    padding:24px;
+  }
+  .welcome-card{
+    max-width:680px;width:100%;
+    background:linear-gradient(160deg,rgba(20,28,56,.95),rgba(10,14,30,.95));
+    border:1px solid rgba(77,163,255,.25);border-radius:26px;
+    padding:48px 40px;text-align:center;
+    box-shadow:0 30px 90px rgba(0,0,0,.8), 0 0 80px rgba(77,163,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
+    position:relative;overflow:hidden;
+  }
+  .welcome-card::before{
+    content:"";position:absolute;top:-50%;left:-50%;
+    width:200%;height:200%;
+    background:conic-gradient(from 0deg, transparent, rgba(77,163,255,.08), transparent, rgba(124,92,255,.08), transparent, rgba(255,207,92,.05), transparent);
+    animation:spin 24s linear infinite;pointer-events:none;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .welcome-card > *{position:relative;z-index:1}
+  .welcome-card h1{
+    font-size:2.4rem;margin-bottom:16px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--gold));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    letter-spacing:1px;filter:drop-shadow(0 0 20px rgba(77,163,255,.4));
+  }
+  .welcome-card p{color:var(--muted);line-height:2;margin-bottom:16px;font-size:1.02rem}
+  .welcome-card .steps{
+    text-align:right;background:rgba(77,163,255,.07);
+    border:1px solid rgba(77,163,255,.2);border-radius:16px;
+    padding:20px 24px;margin:24px 0;font-size:.95rem;line-height:2.2;
+  }
+  html[lang="en"] .welcome-card .steps{text-align:left}
+  .welcome-card .steps b{color:var(--accent)}
+  .btn{
+    cursor:pointer;border:none;border-radius:14px;
+    padding:15px 38px;font-size:1.05rem;font-weight:700;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    color:#fff;transition:.25s;
+    box-shadow:0 10px 30px rgba(77,163,255,.35);font-family:inherit;
+  }
+  .btn:hover{transform:translateY(-3px);box-shadow:0 16px 44px rgba(77,163,255,.55)}
+  .btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+  #app{display:none;height:100vh;position:relative;overflow:hidden}
+  #stars{position:absolute;inset:0;z-index:0;pointer-events:none}
+  .star{position:absolute;background:#fff;border-radius:50%;animation:twinkle 3s ease-in-out infinite}
+  @keyframes twinkle{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:1;transform:scale(1.4)}}
+
+  /* ============================================================
+     الأجندة الزمنية — ثابتة على اليمين في اللغتين
+     ============================================================ */
+  #timeline{
+    position:absolute;top:22px;right:22px;z-index:20;
+    width:280px;height:280px;background:#f0f0f0;border-radius:12px;
+    display:flex;flex-direction:column;overflow:hidden;
+    font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  }
+  .sticky-titlebar{
+    background:linear-gradient(180deg,#2aa198 0%,#1e7b74 100%);
+    padding:6px 8px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid #155e58;border-radius:12px 12px 0 0;flex-shrink:0;
+  }
+  .sticky-title-left{display:flex;align-items:center;gap:6px}
+  .sticky-icon{font-size:1.1rem}
+  .sticky-title-text{color:#fff;font-size:.85rem;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .sticky-controls{display:flex;gap:4px}
+  .sticky-ctrl-btn{
+    width:22px;height:20px;border-radius:4px;
+    border:1px solid #0f4a45;background:linear-gradient(180deg,#b0e8e4,#8ad4ce);
+    color:#0f4a45;font-size:.7rem;font-weight:700;cursor:default;
+    display:flex;align-items:center;justify-content:center;padding:0;
+    font-family:inherit;pointer-events:none;opacity:.7;
+  }
+  .sticky-ctrl-btn.close{background:linear-gradient(180deg,#ffb0b0,#e08080);border-color:#a06060;color:#fff}
+  .sticky-toolbar{
+    background:#f0f0f0;padding:6px 8px;display:flex;align-items:center;gap:6px;
+    border-bottom:1px solid #c0c0c0;flex-shrink:0;
+  }
+  .tool-btn{
+    width:26px;height:26px;border-radius:4px;border:1px solid #c0c0c0;background:#fff;
+    cursor:default;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;
+    font-family:inherit;pointer-events:none;opacity:.7;
+  }
+  .tool-btn.color-btn{background:#e0c0ff;border-color:#b090d0}
+  .tool-divider{width:1px;height:18px;background:#c0c0c0;margin:0 2px}
+  .tool-spacer{flex:1}
+  .drag-dots{color:#a0a0a0;font-size:.8rem;letter-spacing:-1px}
+  .sticky-content{background:#f0f0f0;padding:10px;flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .sticky-paper{background:#f0f0f0;padding:12px 10px;flex:1;display:flex;flex-direction:column;position:relative;border-radius:0 0 8px 8px}
+  .agenda-year{text-align:center;margin-bottom:8px;position:relative}
+  .agenda-year .value{font-size:2.2rem;font-weight:700;color:#4a3f1e;font-family:"Georgia",serif;line-height:1}
+  .agenda-year .label{font-size:.65rem;color:#8b7d4a;letter-spacing:3px;margin-top:2px;font-style:italic}
+  .agenda-controls{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+  .agenda-btn{
+    flex:1;padding:6px 0;border:1px solid #c0b070;border-radius:4px;
+    background:linear-gradient(180deg,#f0e8c0,#e0d4a0);
+    color:#4a3f1e;font-family:"Georgia",serif;font-size:.8rem;font-weight:700;
+    cursor:pointer;transition:.2s;
+  }
+  .agenda-btn:hover:not(:disabled){background:linear-gradient(180deg,#ffe080,#f0c040);border-color:#a09050}
+  .agenda-btn:disabled{opacity:.4;cursor:not-allowed}
+  .agenda-progress-wrap{margin-bottom:8px}
+  .agenda-progress-label{font-size:.62rem;color:#8b7d4a;letter-spacing:1px;text-align:center;margin-bottom:4px;font-style:italic}
+  .agenda-progress{height:5px;background:rgba(139,125,74,.2);border-radius:3px;overflow:hidden}
+  .agenda-progress > div{height:100%;width:0;background:linear-gradient(90deg,#b09050,#ffcf5c);transition:width .4s ease}
+
+  /* ============================================================
+     أزرار التحكم — أفقية دائمًا على اليسار في اللغتين
+     ============================================================ */
+  #controls-stack{
+    position:absolute;top:22px;left:22px;z-index:20;
+    display:flex;flex-direction:row;gap:10px;
+  }
+  #notes-toggle, #lang-toggle, #sources-toggle{
+    width:52px;height:52px;border-radius:16px;
+    background:linear-gradient(160deg,rgba(20,28,56,.92),rgba(10,14,30,.92));
+    border:1px solid var(--border);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(18px);transition:.2s;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);font-family:inherit;
+  }
+  #notes-toggle{color:var(--gold);font-size:1.4rem}
+  #notes-toggle:hover{border-color:var(--gold);transform:scale(1.06);box-shadow:0 0 28px rgba(255,207,92,.4)}
+  #notes-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  #lang-toggle{color:var(--accent);font-size:1.3rem;position:relative}
+  #lang-toggle:hover{border-color:var(--accent);transform:scale(1.06);box-shadow:0 0 28px rgba(77,163,255,.5)}
+  #lang-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  #lang-toggle .lang-badge{
+    position:absolute;bottom:-4px;right:-4px;
+    background:var(--accent);color:#fff;font-size:.6rem;font-weight:700;
+    padding:2px 6px;border-radius:8px;border:2px solid #0a0e1e;letter-spacing:.5px;
+  }
+  html[lang="en"] #lang-toggle .lang-badge{right:auto;left:-4px}
+
+  #sources-toggle{color:#5fe0a0;font-size:1.3rem}
+  #sources-toggle:hover{border-color:#5fe0a0;transform:scale(1.06);box-shadow:0 0 28px rgba(95,224,160,.4)}
+  #sources-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  /* ============================================================
+     لوحة التلميحات
+     ============================================================ */
+  #notes-panel{
+    position:absolute;top:22px;left:214px;z-index:20;
+    width:320px;max-height:70vh;overflow-y:auto;
+    background:linear-gradient(160deg,rgba(20,28,56,.97),rgba(10,14,30,.97));
+    border:1px solid rgba(77,163,255,.25);border-radius:20px;
+    padding:22px;backdrop-filter:blur(20px);
+    box-shadow:0 24px 70px rgba(0,0,0,.7), 0 0 40px rgba(77,163,255,.08);
+    display:none;
+  }
+  #notes-panel.open{display:block;animation:slideIn .25s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+  #notes-panel h3{font-size:1rem;margin-bottom:14px;color:var(--accent);letter-spacing:.5px}
+  #notes-panel p{font-size:.85rem;color:var(--muted);line-height:1.9;margin-bottom:12px}
+  #notes-panel .note-item{
+    padding:12px;border-radius:12px;background:rgba(77,163,255,.08);
+    border-right:3px solid var(--accent);margin-bottom:9px;font-size:.85rem;
+    transition:.2s;line-height:1.7;
+  }
+  html[lang="en"] #notes-panel .note-item{border-right:none;border-left:3px solid var(--accent)}
+  #notes-panel .note-item:hover{background:rgba(77,163,255,.14);transform:translateX(-3px)}
+  html[lang="en"] #notes-panel .note-item:hover{transform:translateX(3px)}
+  #notes-panel .note-item b{color:var(--accent)}
+
+  #map{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center}
+  #map svg{width:100%;height:100%}
+  .sun-core{fill:url(#sunGrad);filter:drop-shadow(0 0 50px rgba(255,180,60,1))}
+  .sun-halo{fill:url(#haloGrad);opacity:.6}
+  .clickable-body{cursor:pointer;transition:.2s}
+  .clickable-body:hover{filter:drop-shadow(0 0 26px currentColor)}
+  .planet-label{fill:#fff;font-size:15px;font-weight:700;pointer-events:none}
+  .planet-sub{fill:var(--muted);font-size:12px;pointer-events:none;paint-order:stroke;stroke:#000;stroke-width:2.5px;stroke-linejoin:round}
+  .deep-space-arrow{cursor:pointer;transition:.2s}
+  .deep-space-arrow:hover{filter:drop-shadow(0 0 18px var(--teal))}
+  .deep-space-arrow .arrow-label{
+    fill:var(--teal-light);font-size:14px;font-weight:700;pointer-events:none;
+    paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;
+    animation:labelPulse 2s ease-in-out infinite;
+  }
+  @keyframes labelPulse{0%,100%{opacity:1}50%{opacity:.65}}
+  .deep-space-arrow .arrow-line{stroke:var(--teal);stroke-width:3;stroke-dasharray:9 5;animation:dashMove 1.5s linear infinite}
+  @keyframes dashMove{to{stroke-dashoffset:-28}}
+  .deep-space-arrow .arrow-head{fill:var(--teal)}
+
+  /* ============================================================
+     صفحة الكوكب — خلفية صورة الخريطة
+     ============================================================ */
+  #planet-page{
+    position:absolute;inset:0;z-index:25;
+    background:radial-gradient(circle at 50% 30%,rgba(77,163,255,.08),transparent 60%),linear-gradient(180deg,#070b16 0%,#05070f 100%);
+    display:none;flex-direction:column;
+  }
+  #planet-page.open{display:flex;animation:fadeIn .3s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .planet-header{
+    padding:18px 24px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--border);background:rgba(13,18,36,.85);backdrop-filter:blur(14px);
+    position:relative;z-index:2;
+  }
+  .planet-header h2{font-size:1.3rem;color:var(--gold)}
+  .planet-header .sub{font-size:.85rem;color:var(--muted);margin-top:4px}
+  .back-btn{
+    cursor:pointer;border:none;border-radius:10px;
+    padding:11px 22px;font-size:.9rem;font-weight:700;
+    background:var(--panel-2);color:var(--text);
+    border:1px solid var(--border);margin-bottom:22px;transition:.2s;
+    font-family:inherit;
+  }
+  .back-btn:hover{background:linear-gradient(90deg,var(--accent),var(--accent-2));border-color:transparent;transform:translateX(4px)}
+  html[lang="en"] .back-btn:hover{transform:translateX(-4px)}
+  .back-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  .planet-map-area{
+    flex:1;position:relative;overflow:hidden;
+    background:
+      radial-gradient(ellipse at 50% 40%, #14204a 0%, #070b16 55%, #03040a 100%),
+      radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 80% 20%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 60% 70%, #fff, transparent),
+      radial-gradient(1px 1px at 30% 80%, #fff, transparent),
+      radial-gradient(1px 1px at 90% 60%, #fff, transparent);
+    background-size:100% 100%, 200px 200px, 300px 300px, 250px 250px, 350px 350px, 280px 280px;
+    background-position:center;
+    background-repeat:no-repeat;
+    background-size:cover;
+  }
+  /* عند وجود صورة خريطة، تُستخدم كخلفية */
+  .planet-map-area.has-map{
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+  }
+  .planet-map-area.has-map::before{
+    content:"";
+    position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(5,7,15,.35),rgba(5,7,15,.65));
+    pointer-events:none;
+    z-index:0;
+  }
+  #planet-objects-layer{position:absolute;inset:0;z-index:1}
+  .planet-object{
+    position:absolute;cursor:pointer;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;transition:.25s;
+    background:none;border:none;font-family:inherit;padding:0;
+    z-index:1;
+  }
+  .planet-object:hover{transform:translate(-50%,-50%) scale(1.18)}
+  .planet-object:focus-visible{outline:2px solid var(--gold);outline-offset:6px;border-radius:12px}
+  .planet-object .p-dot{
+    width:24px;height:24px;border-radius:50%;
+    box-shadow:0 0 24px currentColor, 0 0 8px currentColor;
+    animation:pulseBox 2s ease-in-out infinite;
+  }
+  @keyframes pulseBox{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.85}}
+  .planet-object .p-label{
+    margin-top:9px;font-size:.76rem;color:var(--text);
+    background:rgba(13,18,36,.92);padding:5px 11px;border-radius:9px;
+    border:1px solid var(--border);white-space:nowrap;font-weight:600;backdrop-filter:blur(6px);
+  }
+  .planet-object.visited .p-label{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(255,207,92,.3)}
+  .planet-object.unvisited .p-label::after{content:" ●";color:var(--accent);font-size:.7em}
+
+  #object-page{
+    position:absolute;inset:0;z-index:30;
+    background:radial-gradient(circle at 50% 0%,rgba(77,163,255,.1),transparent 60%),linear-gradient(180deg,#070b16 0%,#05070f 100%);
+    overflow-y:auto;display:none;
+  }
+  #object-page.open{display:block;animation:fadeIn .3s ease}
+  .object-hero{
+    position:relative;width:100%;height:min(62vh, 560px);min-height:320px;overflow:hidden;
+    background:radial-gradient(circle at 50% 45%,rgba(77,163,255,.16),transparent 65%),linear-gradient(135deg,#101a36,#0a1024);
+  }
+  .object-hero img, .object-hero .hero-placeholder{width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+  .object-hero .hero-placeholder{
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;color:var(--muted);font-size:1rem;letter-spacing:.5px;
+  }
+  .object-hero::after{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:55%;
+    background:linear-gradient(to bottom,rgba(5,7,15,0) 0%,rgba(5,7,15,.35) 35%,rgba(5,7,15,.75) 65%,rgba(5,7,15,.96) 88%,#05070f 100%);
+    pointer-events:none;
+  }
+  .hero-back{
+    position:absolute;top:18px;right:18px;z-index:2;
+    cursor:pointer;border:none;border-radius:12px;
+    padding:11px 20px;font-size:.9rem;font-weight:700;
+    background:rgba(13,18,36,.75);color:var(--text);
+    border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(10px);transition:.2s;font-family:inherit;
+  }
+  html[lang="en"] .hero-back{right:auto;left:18px}
+  .hero-back:hover{background:linear-gradient(90deg,var(--accent),var(--accent-2));border-color:transparent;transform:translateX(4px)}
+  html[lang="en"] .hero-back:hover{transform:translateX(-4px)}
+  .hero-back:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .object-content{max-width:820px;margin:0 auto;padding:0 24px 60px;margin-top:-90px;position:relative;z-index:2}
+  .object-title{font-size:2rem;margin-bottom:8px;color:var(--gold);text-shadow:0 0 28px rgba(255,207,92,.4), 0 4px 24px rgba(0,0,0,.8)}
+  .object-meta{color:var(--muted);font-size:.9rem;margin-bottom:26px;letter-spacing:.5px;text-shadow:0 2px 12px rgba(0,0,0,.9)}
+  .object-story{line-height:2.15;font-size:1.05rem;color:var(--text);text-shadow:0 2px 14px rgba(0,0,0,.85)}
+  html[lang="en"] .object-story{line-height:1.9}
+
+  /* ============================================================
+     صفحة المصادر
+     ============================================================ */
+  #sources-page{
+    position:absolute;inset:0;z-index:35;
+    background:radial-gradient(circle at 50% 20%,rgba(95,224,160,.08),transparent 60%),linear-gradient(180deg,#070b16 0%,#05070f 100%);
+    display:none;flex-direction:column;
+  }
+  #sources-page.open{display:flex;animation:fadeIn .3s ease}
+  .sources-header{
+    padding:18px 24px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--border);background:rgba(13,18,36,.85);backdrop-filter:blur(14px);
+  }
+  .sources-header h2{font-size:1.3rem;color:#5fe0a0}
+  .sources-content{
+    flex:1;overflow-y:auto;
+    max-width:820px;margin:0 auto;width:100%;
+    padding:40px 24px 60px;
+  }
+  .sources-content .intro-note{
+    background:rgba(95,224,160,.07);
+    border:1px solid rgba(95,224,160,.25);
+    border-radius:16px;padding:22px 26px;
+    color:var(--muted);font-size:.95rem;line-height:2;
+    margin-bottom:28px;
+  }
+  .sources-content .intro-note b{color:#5fe0a0}
+  .sources-content .intro-note .src-link{
+    display:inline-block;
+    margin-top:6px;
+    padding:8px 16px;
+    background:rgba(95,224,160,.12);
+    border:1px solid rgba(95,224,160,.4);
+    border-radius:10px;
+    color:#5fe0a0;
+    font-size:.85rem;
+    font-weight:700;
+    text-decoration:none;
+    transition:.2s;
+  }
+  .sources-content .intro-note .src-link:hover{
+    background:rgba(95,224,160,.22);
+    border-color:#5fe0a0;
+    color:#fff;
+    transform:translateY(-2px);
+    box-shadow:0 6px 18px rgba(95,224,160,.25);
+  }
+
+  .sources-content .source-block{
+    background:rgba(20,28,56,.6);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px 26px;
+    margin-bottom:22px;
+  }
+  .sources-content .source-block h3{
+    font-size:1.05rem;
+    color:#5fe0a0;
+    margin-bottom:14px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .sources-content .source-block h3 .src-icon{font-size:1.2rem}
+
+  .sources-content .src-list{
+    list-style:none;
+    padding:0;margin:0;
+  }
+  .sources-content .src-list li{
+    padding:10px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    font-size:.9rem;
+    line-height:1.8;
+    color:var(--text);
+  }
+  .sources-content .src-list li:last-child{border-bottom:none}
+  .sources-content .src-list li b{
+    color:var(--gold);
+    font-weight:700;
+  }
+  .sources-content .src-list li .src-mini-link{
+    display:inline-block;
+    margin-inline-start:8px;
+    font-size:.72rem;
+    color:var(--accent);
+    text-decoration:none;
+    border-bottom:1px dashed var(--accent);
+    padding-bottom:1px;
+    transition:.2s;
+    font-weight:600;
+  }
+  .sources-content .src-list li .src-mini-link:hover{
+    color:var(--gold);
+    border-color:var(--gold);
+  }
+  .sources-content .src-list li .src-detail{
+    color:var(--muted);
+    font-size:.82rem;
+    display:block;
+    margin-top:3px;
+  }
+
+  #year-lock-toast{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:40;background:linear-gradient(160deg,rgba(20,28,56,.97),rgba(10,14,30,.97));
+    border:1px solid var(--gold);border-radius:20px;
+    padding:26px 34px;text-align:center;
+    box-shadow:0 26px 70px rgba(0,0,0,.75), 0 0 50px rgba(255,207,92,.25);
+    display:none;animation:popIn .3s ease;max-width:400px;
+  }
+  #year-lock-toast.open{display:block}
+  @keyframes popIn{from{opacity:0;transform:translate(-50%,-50%) scale(.9)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+  #year-lock-toast h4{color:var(--gold);margin-bottom:12px;font-size:1.05rem}
+  #year-lock-toast p{color:var(--muted);font-size:.87rem;line-height:1.85;margin-bottom:16px;text-align:right}
+  html[lang="en"] #year-lock-toast p{text-align:left}
+  #year-lock-toast .btn{padding:11px 26px;font-size:.92rem}
+
+  @media (max-width:700px){
+    #welcome-lang{top:14px;left:14px;padding:10px 16px;font-size:.85rem}
+    html[lang="en"] #welcome-lang{left:auto;right:14px}
+    #timeline{width:220px;height:220px;top:14px;right:14px}
+    .agenda-year .value{font-size:1.8rem}
+    .agenda-btn{font-size:.7rem;padding:5px 0}
+    #controls-stack{top:14px;left:14px;gap:8px}
+    #notes-toggle,#lang-toggle,#sources-toggle{width:44px;height:44px;font-size:1.1rem}
+    #notes-panel{width:calc(100% - 28px);left:14px;top:70px}
+    .object-hero{height:46vh;min-height:240px}
+    .object-content{margin-top:-60px;padding:0 16px 40px}
+    .object-title{font-size:1.5rem}
+  }
+</style>
+</head>
+<body>
+
+<button id="welcome-lang" onclick="toggleLanguage()" type="button" aria-label="Change language">
+  <span class="wl-icon">🌐</span>
+  <span class="wl-label" id="welcome-lang-label">English</span>
+</button>
+
+<div id="welcome">
+  <div class="welcome-card">
+    <h1 data-i18n="welcome.title">ما ترك وراءنا</h1>
+    <p data-i18n="welcome.intro">رحلة تفاعلية عبر تاريخ استكشاف الفضاء — من أول هبوط ناعم على القمر (Luna 9 عام 1966) إلى المسابير التي ما زالت تبتعد في الفضاء السحيق.</p>
+    <div class="steps">
+      <b data-i18n="welcome.howto">كيف تستخدم البرنامج؟</b><br>
+      <span data-i18n="welcome.step1">١. حرّك الأجندة الزمنية أعلى اليمين سنة بسنة (تبدأ من 1966).</span><br>
+      <span data-i18n="welcome.step2">٢. انقر على القمر أو المريخ أو أسهم الفضاء السحيق لترى خريطتها وأجسامها.</span><br>
+      <span data-i18n="welcome.step3">٣. انقر على أي جسم لتقرأ قصته.</span><br>
+      <span data-i18n="welcome.step4">٤. لن تنتقل إلى سنة جديدة فيها أُرسلت أجسام فضائية جديدة للفضاء قبل أن تزور كل الأجسام الجديدة في السنة الحالية.</span><br>
+      <span data-i18n="welcome.step5">٥. زر التلميحات على اليسار يقدم لك مساعدة.</span>
+    </div>
+    <button class="btn" onclick="startApp()" data-i18n="welcome.start">ابدأ الرحلة</button>
+  </div>
+</div>
+
+<div id="app">
+  <div id="stars"></div>
+
+  <div id="timeline">
+    <div class="sticky-titlebar">
+      <div class="sticky-title-left">
+        <span class="sticky-icon">📅</span>
+        <span class="sticky-title-text" data-i18n="timeline.title">الأجندة الزمنية</span>
+      </div>
+      <div class="sticky-controls">
+        <button class="sticky-ctrl-btn minimize">_</button>
+        <button class="sticky-ctrl-btn maximize">□</button>
+        <button class="sticky-ctrl-btn close">✕</button>
+      </div>
+    </div>
+    <div class="sticky-toolbar">
+      <button class="tool-btn">📄</button>
+      <button class="tool-btn">T</button>
+      <button class="tool-btn color-btn"></button>
+      <div class="tool-divider"></div>
+      <button class="tool-btn">🗑️</button>
+      <button class="tool-btn">📌</button>
+      <div class="tool-spacer"></div>
+      <span class="drag-dots">⋮⋮</span>
+    </div>
+    <div class="sticky-content">
+      <div class="sticky-paper">
+        <div class="agenda-year">
+          <div class="value" id="year-display">1966</div>
+          <div class="label" data-i18n="timeline.yearLabel">السنة</div>
+        </div>
+        <div class="agenda-controls">
+          <button class="agenda-btn" id="year-prev" onclick="changeYear(-1)" data-i18n="timeline.prev" data-i18n-title="timeline.prevTitle" data-i18n-aria-label="timeline.prevTitle">‹ السابقة</button>
+          <button class="agenda-btn" id="year-next" onclick="changeYear(1)" data-i18n="timeline.next" data-i18n-title="timeline.nextTitle" data-i18n-aria-label="timeline.nextTitle">التالية ›</button>
+        </div>
+        <div class="agenda-progress-wrap">
+          <div class="agenda-progress-label" data-i18n="timeline.progressLabel">التقدم في الرحلة</div>
+          <div class="agenda-progress"><div id="year-progress"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls-stack">
+    <button id="notes-toggle" onclick="toggleNotes()" data-i18n-title="notes.tooltip" data-i18n-aria-label="notes.tooltip" title="التلميحات والمساعدة" aria-label="التلميحات والمساعدة">❓</button>
+    <button id="lang-toggle" onclick="toggleLanguage()" data-i18n-title="lang.tooltipSwitch" data-i18n-aria-label="lang.tooltipSwitch" aria-label="Change language">
+      🌐
+      <span class="lang-badge" id="lang-badge">ع</span>
+    </button>
+    <button id="sources-toggle" onclick="openSourcesPage()" data-i18n-title="sources.tooltip" data-i18n-aria-label="sources.tooltip" title="المصادر" aria-label="المصادر">📚</button>
+  </div>
+
+  <div id="notes-panel">
+    <h3 data-i18n="notes.title">تلميحات ومساعدة</h3>
+    <p data-i18n="notes.intro">نصائح عملية لاستخدام البرنامج بسلاسة:</p>
+    <div class="note-item" data-i18n-html="notes.item1">🧭 <b>حرّك الأجندة أولًا:</b> استخدم زرّي «السابقة» و«التالية» أعلى اليمين للتنقل بين السنوات. يبدأ البرنامج من 1966.</div>
+    <div class="note-item" data-i18n-html="notes.item2">🖱️ <b>افتح الخريطة:</b> انقر على القمر أو المريخ أو أسهم الفضاء السحيق لعرض الأجسام المتاحة في تلك السنة.</div>
+    <div class="note-item" data-i18n-html="notes.item3">📍 <b>افتح الجسم:</b> داخل الخريطة، انقر على أي نقطة مضيئة لتقرأ قصتها. النقطة ذات العلامة ● لم تُزر بعد.</div>
+    <div class="note-item" data-i18n-html="notes.item4">✅ <b>أكمل السنة:</b> بعد قراءة كل الأجسام في السنة، سيُفتح زر «التالية» للانتقال إلى السنة الجديدة.</div>
+    <div class="note-item" data-i18n-html="notes.item5">↩️ <b>العودة:</b> استخدم زر «العودة» أعلى الصورة للرجوع من صفحة الجسم إلى خريطة الكوكب، ثم إلى النظام الشمسي.</div>
+  </div>
+
+  <div id="map">
+    <svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <radialGradient id="sunGrad">
+          <stop offset="0%" stop-color="#fff4c2"/><stop offset="35%" stop-color="#ffe08a"/>
+          <stop offset="70%" stop-color="#ffb347"/><stop offset="100%" stop-color="#ff7b00"/>
+        </radialGradient>
+        <radialGradient id="haloGrad">
+          <stop offset="0%" stop-color="#ffcf5c" stop-opacity=".55"/>
+          <stop offset="60%" stop-color="#ff9d2e" stop-opacity=".2"/>
+          <stop offset="100%" stop-color="#ff7b00" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <circle class="sun-halo" cx="500" cy="350" r="160"/>
+      <circle class="sun-halo" cx="500" cy="350" r="110" opacity=".7"/>
+      <circle class="sun-core" cx="500" cy="350" r="70"/>
+
+      <!-- الأرض (إيموجي) — font-size 25 -->
+      <g class="orbit-earth">
+        <g class="planet-icon-wrap" transform="translate(620, 290)">
+          <text x="0" y="0" font-size="25" text-anchor="middle" dominant-baseline="central"
+                style="font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;">🌍</text>
+        </g>
+        <text class="planet-label" id="earth-label" x="620" y="340" text-anchor="middle" data-i18n="planets.earth">الأرض</text>
+      </g>
+
+      <!-- القمر (إيموجي) — font-size 12 -->
+      <g class="clickable-body orbit-moon" data-location="moon" data-name="القمر" data-name-key="planets.moon" style="color:#e8e8e8" tabindex="0" role="button">
+        <g class="planet-icon-wrap" transform="translate(668, 330)">
+          <text x="0" y="0" font-size="12" text-anchor="middle" dominant-baseline="central"
+                style="font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;">🌕</text>
+        </g>
+        <text class="planet-sub" id="moon-label" x="668" y="358" text-anchor="middle" data-i18n="planets.moon">القمر</text>
+      </g>
+
+      <!-- المريخ (إيموجي) — font-size 22 -->
+      <g class="clickable-body orbit-mars" data-location="mars" data-name="المريخ" data-name-key="planets.mars" style="color:#ff9a6c" tabindex="0" role="button">
+        <g class="planet-icon-wrap" transform="translate(330, 470)">
+          <text x="0" y="0" font-size="22" text-anchor="middle" dominant-baseline="central"
+                style="font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;">🔴</text>
+        </g>
+        <text class="planet-label" id="mars-label" x="330" y="510" text-anchor="middle" data-i18n="planets.mars">المريخ</text>
+      </g>
+
+      <g class="deep-space-arrow" data-location="deep" data-name="الفضاء السحيق" data-name-key="planets.deep" tabindex="0" role="button">
+        <line class="arrow-line" x1="220" y1="150" x2="90" y2="70"/>
+        <polygon class="arrow-head" points="87.4,68.4 103.0,69.8 95.7,81.7"/>
+        <text class="arrow-label" x="150" y="110" text-anchor="middle" data-i18n="planets.deepArrow">الفضاء السحيق ←</text>
+      </g>
+      <g class="deep-space-arrow" data-location="deep" data-name="الفضاء السحيق" data-name-key="planets.deep" tabindex="0" role="button">
+        <line class="arrow-line" x1="780" y1="550" x2="910" y2="630"/>
+        <polygon class="arrow-head" points="912.6,631.6 897.0,630.2 904.3,618.3"/>
+        <text class="arrow-label" x="850" y="590" text-anchor="middle" data-i18n="planets.deepArrow2">← الفضاء السحيق</text>
+      </g>
+    </svg>
+  </div>
+
+  <div id="planet-page">
+    <div class="planet-header">
+      <button class="back-btn" onclick="closePlanetPage()" style="margin:0" data-i18n="planet.backToSystem">→ العودة إلى النظام الشمسي</button>
+      <div>
+        <h2 id="pp-title">خريطة الكوكب</h2>
+        <div class="sub" id="pp-sub"></div>
+      </div>
+    </div>
+    <div class="planet-map-area" id="pp-map-area">
+      <div id="planet-objects-layer"></div>
+    </div>
+  </div>
+
+  <div id="object-page">
+    <div class="object-hero" id="op-hero">
+      <button class="hero-back" onclick="closeObjectPage()" data-i18n="object.back">→ العودة</button>
+      <div class="hero-placeholder" id="op-image" data-i18n="object.imagePlaceholder">[الصورة ستُضاف لاحقًا]</div>
+    </div>
+    <div class="object-content">
+      <h2 class="object-title" id="op-title"></h2>
+      <div class="object-meta" id="op-meta"></div>
+      <div class="object-story" id="op-story"></div>
+    </div>
+  </div>
+
+  <!-- صفحة المصادر -->
+  <div id="sources-page">
+    <div class="sources-header">
+      <button class="back-btn" onclick="closeSourcesPage()" style="margin:0" data-i18n="sources.back">→ العودة</button>
+      <h2 data-i18n="sources.title">المصادر</h2>
+    </div>
+    <div class="sources-content">
+
+      <div class="intro-note">
+        <b data-i18n="sources.introTitle">المصدر الرئيسي:</b>
+        <span data-i18n="sources.intro">NASA Data & Resources — NASA Space Science Data Coordinated Archive (NSSDCA)</span>
+        <br>
+        <span data-i18n="sources.introDetail">أرشيف NSSDCA هو الكتالوج الرسمي المتاح للجمهور من NASA. يمكن من خلاله البحث عن أي مركبة فضائية أو أداة أُرسلت إلى الفضاء، واسترجاع معاملات مهمتها، ومعرفة مكانها النهائي وحالة تشغيلها بدقة.</span>
+        <br><br>
+        <a class="src-link" href="https://nssdc.gsfc.nasa.gov/" target="_blank" rel="noopener noreferrer">
+          <span data-i18n="sources.visitNssdca">زيارة أرشيف NSSDCA ←</span>
+        </a>
+      </div>
+
+      <!-- القمر -->
+      <div class="source-block">
+        <h3><span class="src-icon">🌕</span> <span data-i18n="sources.moonTitle">القمر</span></h3>
+        <ul class="src-list">
+          <li>
+            <b data-i18n="sources.moon.apolloName">Apollo Lunar Modules</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059C" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.moon.apolloDetail">تُركت مراحل الهبوط (Descent Stages) للمركبات القمرية — مثل Eagle في أبولو 11 — خلفها كمنصات إطلاق.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.moon.lrvName">Lunar Roving Vehicles (LRVs)</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1971-063C" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.moon.lrvDetail">ثلاث "عربات قمرية" كهربائية قادها رواد الفضاء، متوقفة بشكل دائم على سطح القمر.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.moon.alsepName">ALSEP Scientific Packages</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/experiment/display.action?id=1969-059C-01" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.moon.alsepDetail">حزم تجارب أبولو (مقاييس الزلازل، العواكس الرجعية، إلخ) تُركت لتواصل العلم بعد رحيل رواد الفضاء.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.moon.surveyorName">Surveyor Landers</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1966-045A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.moon.surveyorDetail">مسابير روبوتية أُرسلت في الستينيات لإثبات إمكانية الهبوط الناعم.</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- المريخ -->
+      <div class="source-block">
+        <h3><span class="src-icon">🔴</span> <span data-i18n="sources.marsTitle">المريخ</span></h3>
+        <ul class="src-list">
+          <li>
+            <b data-i18n="sources.mars.sojournerName">Sojourner Rover</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1996-068A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.mars.sojournerDetail">أول مركبة جوالة على المريخ (1997)، أوصلتها مركبة Pathfinder. متوقفة الآن بشكل دائم.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.mars.spiritOppName">Spirit & Opportunity</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2003-027A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.mars.spiritOppDetail">جوالة توأم عملت لسنوات. كلتاهما الآن غير نشطتين — نُصبان تذكاريان لاستكشاف المريخ.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.mars.vikingName">Viking 1 & 2 Landers</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1975-075A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.mars.vikingDetail">أول مركبات هبوط أمريكية تعمل بنجاح على المريخ (1976)، بقيت في مكان هبوطها بالضبط.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.mars.phoenixInSightName">Phoenix & InSight Landers</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2007-034A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.mars.phoenixInSightDetail">Phoenix حفرت بحثًا عن الجليد المائي؛ InSight رصدت زلازل المريخ. كلتاهما فقدت طاقتها في النهاية.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.mars.ingenuityName">Ingenuity Helicopter</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2020-052A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.mars.ingenuityDetail">أول طائرة على كوكب آخر. تعرضت لأضرار في الدوار وأصبحت قطعة أثرية ثابتة.</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- الفضاء السحيق -->
+      <div class="source-block">
+        <h3><span class="src-icon">🪐</span> <span data-i18n="sources.deepTitle">الفضاء السحيق</span></h3>
+        <ul class="src-list">
+          <li>
+            <b data-i18n="sources.deep.pioneerName">Pioneer 10 & 11</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1972-012A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.deep.pioneerDetail">مسابير فضائية مبكرة استكشفت الكواكب الخارجية. تنجرف الآن بصمت خارج النظام الشمسي.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.deep.dawnName">Dawn Spacecraft</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2007-043A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.deep.dawnDetail">رسمت خرائط فيستا وسيريس. نفد وقودها وبقيت في مدار دائم غير مزوّد بالطاقة حول سيريس.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.deep.nearName">NEAR Shoemaker</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1996-008A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.deep.nearDetail">أول مركبة فضائية تدور حول كويكب وتهبط عليه. ترقد الآن على سطح 433 إيروس.</span>
+          </li>
+          <li>
+            <b data-i18n="sources.deep.keplerName">Kepler Space Telescope</b>
+            <a class="src-mini-link" href="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2009-011A" target="_blank" rel="noopener noreferrer" data-i18n="sources.linkNssdca">NSSDCA</a>
+            <span class="src-detail" data-i18n="sources.deep.keplerDetail">تلسكوب ثوري لصيد الكواكب الخارجية، نفد وقوده وينجرف في مدار يتبع الأرض.</span>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="year-lock-toast">
+    <h4 data-i18n="yearLock.title">🔒 السنة التالية مقفلة</h4>
+    <p id="year-lock-msg">يجب زيارة كل الأجسام الجديدة في هذه السنة أولًا.</p>
+    <button class="btn" onclick="closeYearLock()" data-i18n="yearLock.ok">حسنًا</button>
+  </div>
+</div>
+
+<script>
+/* ====================================================================
+   نظام الترجمة (I18N)
+   ==================================================================== */
+const I18N = {
+  current: 'ar',
+  dict: {},
+
+  DICTS: {
+    ar: {
+      "app.title": "ما ترك وراءنا — خريطة النظام الشمسي",
+      "welcome.title": "ما ترك وراءنا",
+      "welcome.intro": "رحلة تفاعلية عبر تاريخ استكشاف الفضاء — من أول هبوط ناعم على القمر (Luna 9 عام 1966) إلى المسابير التي ما زالت تبتعد في الفضاء السحيق.",
+      "welcome.howto": "كيف تستخدم البرنامج؟",
+      "welcome.step1": "١. حرّك الأجندة الزمنية أعلى اليمين سنة بسنة (تبدأ من 1966).",
+      "welcome.step2": "٢. انقر على القمر أو المريخ أو أسهم الفضاء السحيق لترى خريطتها وأجسامها.",
+      "welcome.step3": "٣. انقر على أي جسم لتقرأ قصته.",
+      "welcome.step4": "٤. لن تنتقل إلى سنة جديدة أرسلت فيها أجسام فضائية جديدة للفضاء قبل أن تزور كل الأجسام الجديدة في السنة الحالية.",
+      "welcome.step5": "٥. زر التلميحات على اليسار يقدم لك مساعدة.",
+      "welcome.start": "ابدأ الرحلة",
+      "timeline.title": "الأجندة الزمنية",
+      "timeline.yearLabel": "السنة",
+      "timeline.prev": "‹ السابقة",
+      "timeline.prevTitle": "السنة السابقة",
+      "timeline.next": "التالية ›",
+      "timeline.nextTitle": "السنة التالية",
+      "timeline.progressLabel": "التقدم في الرحلة",
+      "notes.tooltip": "التلميحات والمساعدة",
+      "notes.title": "تلميحات ومساعدة",
+      "notes.intro": "نصائح عملية لاستخدام البرنامج بسلاسة:",
+      "notes.item1": "🧭 <b>حرّك الأجندة أولًا:</b> استخدم زرّي «السابقة» و«التالية» أعلى اليمين للتنقل بين السنوات. يبدأ البرنامج من 1966.",
+      "notes.item2": "🖱️ <b>افتح الخريطة:</b> انقر على القمر أو المريخ أو أسهم الفضاء السحيق لعرض الأجسام المتاحة في تلك السنة.",
+      "notes.item3": "📍 <b>افتح الجسم:</b> داخل الخريطة، انقر على أي نقطة مضيئة لتقرأ قصتها. النقطة ذات العلامة ● لم تُزر بعد.",
+      "notes.item4": "✅ <b>أكمل السنة:</b> بعد قراءة كل الأجسام في السنة، سيُفتح زر «التالية» للانتقال إلى السنة الجديدة.",
+      "notes.item5": "↩️ <b>العودة:</b> استخدم زر «العودة» أعلى الصورة للرجوع من صفحة الجسم إلى خريطة الكوكب، ثم إلى النظام الشمسي.",
+      "planets.earth": "الأرض",
+      "planets.moon": "القمر",
+      "planets.mars": "المريخ",
+      "planets.deep": "الفضاء السحيق",
+      "planets.deepArrow": "الفضاء السحيق ←",
+      "planets.deepArrow2": "← الفضاء السحيق",
+      "planet.backToSystem": "→ العودة إلى النظام الشمسي",
+      "planet.mapPlaceholder": "[صورة الخريطة ستُضاف لاحقًا]",
+      "planet.titleTemplate": "خريطة {name}",
+      "planet.subTemplate": "{count} جسم حتى سنة {year}",
+      "planet.empty": "لا توجد أجسام على هذا الموقع حتى هذه السنة",
+      "object.back": "→ العودة",
+      "object.imagePlaceholder": "[الصورة ستُضاف لاحقًا]",
+      "object.imagePending": "[صورة: {name}] — (ستُضاف لاحقًا)",
+      "object.metaTypeSuffix": "• {typeLabel}",
+      "yearLock.title": "🔒 السنة التالية مقفلة",
+      "yearLock.ok": "حسنًا",
+      "yearLock.message": "يجب زيارة الأجسام الجديدة في {year} أولًا:<br><br>{list}<br><br><span style=\"color:#ffcf5c;font-size:.8rem\">💡 انقر على الموقع المذكور أعلاه لتجد الجسم</span>",
+      "yearLock.itemTemplate": "• <b>{name}</b><br><span style=\"color:#8b93a8;font-size:.8rem\">📍 {location}</span>",
+      "yearLock.locationMoon": "{moon} 🌕",
+      "yearLock.locationMars": "{mars} 🔴",
+      "yearLock.locationDeep": "{deep} 🪐",
+      "lang.tooltip": "تغيير اللغة",
+      "lang.badge": "ع",
+      "lang.switchTo": "English",
+      "lang.tooltipSwitch": "التبديل إلى الإنجليزية",
+      "welcomeLang.switchTo": "English",
+      "welcomeLang.tooltip": "التبديل إلى الإنجليزية",
+      "sources.tooltip": "المصادر",
+      "sources.title": "المصادر",
+      "sources.back": "→ العودة",
+      "sources.introTitle": "المصدر الرئيسي:",
+      "sources.intro": "NASA Data & Resources — NASA Space Science Data Coordinated Archive (NSSDCA)",
+      "sources.introDetail": "أرشيف NSSDCA هو الكتالوج الرسمي المتاح للجمهور من NASA. يمكن من خلاله البحث عن أي مركبة فضائية أو أداة أُرسلت إلى الفضاء، واسترجاع معاملات مهمتها، ومعرفة مكانها النهائي وحالة تشغيلها بدقة.",
+      "sources.visitNssdca": "زيارة أرشيف NSSDCA ←",
+      "sources.linkNssdca": "NSSDCA",
+      "sources.moonTitle": "القمر",
+      "sources.moon.apolloName": "Apollo Lunar Modules",
+      "sources.moon.apolloDetail": "تُركت مراحل الهبوط (Descent Stages) للمركبات القمرية — مثل Eagle في أبولو 11 — خلفها كمنصات إطلاق.",
+      "sources.moon.lrvName": "Lunar Roving Vehicles (LRVs)",
+      "sources.moon.lrvDetail": "ثلاث \"عربات قمرية\" كهربائية قادها رواد الفضاء، متوقفة بشكل دائم على سطح القمر.",
+      "sources.moon.alsepName": "ALSEP Scientific Packages",
+      "sources.moon.alsepDetail": "حزم تجارب أبولو (مقاييس الزلازل، العواكس الرجعية، إلخ) تُركت لتواصل العلم بعد رحيل رواد الفضاء.",
+      "sources.moon.surveyorName": "Surveyor Landers",
+      "sources.moon.surveyorDetail": "مسابير روبوتية أُرسلت في الستينيات لإثبات إمكانية الهبوط الناعم.",
+      "sources.marsTitle": "المريخ",
+      "sources.mars.sojournerName": "Sojourner Rover",
+      "sources.mars.sojournerDetail": "أول مركبة جوالة على المريخ (1997)، أوصلتها مركبة Pathfinder. متوقفة الآن بشكل دائم.",
+      "sources.mars.spiritOppName": "Spirit & Opportunity",
+      "sources.mars.spiritOppDetail": "جوالة توأم عملت لسنوات. كلتاهما الآن غير نشطتين — نُصبان تذكاريان لاستكشاف المريخ.",
+      "sources.mars.vikingName": "Viking 1 & 2 Landers",
+      "sources.mars.vikingDetail": "أول مركبات هبوط أمريكية تعمل بنجاح على المريخ (1976)، بقيت في مكان هبوطها بالضبط.",
+      "sources.mars.phoenixInSightName": "Phoenix & InSight Landers",
+      "sources.mars.phoenixInSightDetail": "Phoenix حفرت بحثًا عن الجليد المائي؛ InSight رصدت زلازل المريخ. كلتاهما فقدت طاقتها في النهاية.",
+      "sources.mars.ingenuityName": "Ingenuity Helicopter",
+      "sources.mars.ingenuityDetail": "أول طائرة على كوكب آخر. تعرضت لأضرار في الدوار وأصبحت قطعة أثرية ثابتة.",
+      "sources.deepTitle": "الفضاء السحيق",
+      "sources.deep.pioneerName": "Pioneer 10 & 11",
+      "sources.deep.pioneerDetail": "مسابير فضائية مبكرة استكشفت الكواكب الخارجية. تنجرف الآن بصمت خارج النظام الشمسي.",
+      "sources.deep.dawnName": "Dawn Spacecraft",
+      "sources.deep.dawnDetail": "رسمت خرائط فيستا وسيريس. نفد وقودها وبقيت في مدار دائم غير مزوّد بالطاقة حول سيريس.",
+      "sources.deep.nearName": "NEAR Shoemaker",
+      "sources.deep.nearDetail": "أول مركبة فضائية تدور حول كويكب وتهبط عليه. ترقد الآن على سطح 433 إيروس.",
+      "sources.deep.keplerName": "Kepler Space Telescope",
+      "sources.deep.keplerDetail": "تلسكوب ثوري لصيد الكواكب الخارجية، نفد وقوده وينجرف في مدار يتبع الأرض.",
+      "stations.luna9.name": "Luna 9",
+      "stations.luna9.typeLabel": "مركبة هبوط",
+      "stations.luna9.meta": "فبراير 1966 — سطح القمر — مركبة هبوط",
+      "stations.luna9.story": "في فبراير 1966، هبطت Luna 9 السوفيتية على سطح القمر هبوطًا ناعمًا — أول مرة في التاريخ ينجح فيها جسم من صنع الإنسان في الهبوط على عالم آخر دون أن يتحطم. كانت ثابتة، لكنها أرسلت أول صور من سطح القمر، وأثبتت أن الهبوط الناعم ممكن. قبل أن يطأ الإنسان القمر بثلاث سنوات، كانت Luna 9 قد مهدت الطريق. لكن من سيخطو الخطوة التي عجزت عنها Luna 9: أن يتحرك الإنسان نفسه على هذا السطح؟",
+      "stations.apollo11.name": "مرحلة هبوط أبولو 11",
+      "stations.apollo11.typeLabel": "مرحلة هبوط",
+      "stations.apollo11.meta": "1969 — سطح القمر — مرحلة هبوط",
+      "stations.apollo11.story": "في يوليو 1969، هبطت مركبة أبولو 11 على سطح القمر. بعد أن أكمل رائدا الفضاء مهمتهما وعادا إلى الأرض، تُركت مرحلة الهبوط (Descent Stage) خلفهما — أول أثر بشري على سطح القمر. لم تكن مجرد قطعة معدن، بل كانت البداية: أول مرة يترك فيها الإنسان معداته على عالم آخر. لكن الرحيل لم يكن نهاية العمل؛ فبعض ما تُرك هناك لم يكن ليصمت أبدًا.",
+      "stations.alsep.name": "ALSEP — حزمة تجارب أبولو",
+      "stations.alsep.typeLabel": "أداة علمية",
+      "stations.alsep.meta": "1969-1972 — سطح القمر — أداة علمية",
+      "stations.alsep.story": "بعد أن رحل رواد الفضاء، بقيت الأدوات تعمل. حزمة تجارب أبولو (ALSEP) كانت مجموعة أجهزة علمية تُركت على سطح القمر لترصد الزلازل والرياح الشمسية والمجال المغناطيسي. ظلت تعمل لسنوات بعد رحيل البشر، ترسل بياناتها إلى الأرض بصمت — أول مختبر علمي دائم على عالم آخر. ومع ذلك، كان هناك عالم آخر ينتظر من يذهب إليه… على بعد ملايين الكيلومترات.",
+      "stations.pioneer10.name": "Pioneer 10",
+      "stations.pioneer10.typeLabel": "مسبار",
+      "stations.pioneer10.meta": "1972 — الفضاء السحيق — مسبار",
+      "stations.pioneer10.story": "في 1972، أُطلق Pioneer 10 ليكون أول مسبار يعبر حزام الكويكبات ويتجه نحو الفضاء السحيق. كان رائدًا في فتح الطريق، وأول من أرسل صورًا قريبة للمشتري. بعد أن انقطع الاتصال به، بقي يسبح في الفضاء — صامتًا، لكنه أول من فتح الباب أمام المسابير التي تبعته. وبعد سنوات قليلة، سيسير مسبار آخر على الدرب نفسه، لكنه لن يتوقف عند المشتري.",
+      "stations.viking1.name": "Viking 1",
+      "stations.viking1.typeLabel": "مركبة هبوط",
+      "stations.viking1.meta": "1976 — سطح المريخ — مركبة هبوط",
+      "stations.viking1.story": "في 1976، هبطت Viking 1 على المريخ — أول هبوط ناجح على كوكب آخر. بقيت ثابتة في مكانها، تلتقط الصور وتجري التجارب. أثبتت أن الهبوط ممكن، وأن المريخ يمكن أن يُدرس عن قرب. لكنها لم تتحرك — كانت تنتظر من يأتي بعدها ليجوب السطح. ولم يكن ذلك الانتظار طويلًا كما توقع البعض.",
+      "stations.voyager1.name": "Voyager 1",
+      "stations.voyager1.typeLabel": "مسبار",
+      "stations.voyager1.meta": "1977 — الفضاء السحيق — مسبار",
+      "stations.voyager1.story": "في 1977، أُطلق Voyager 1 في رحلة لم يكن أحد يتوقع أن تستمر عقودًا. مرّ بالمشتري وزحل، ثم تجاوز حدود النظام الشمسي نفسه — أول جسم من صنع الإنسان يخرج إلى الفضاء بين النجوم. لا خطة لإعادته. ما زال يبتعد، حاملًا معه رسالة من البشرية إلى المجهول. وفي الجهة المقابلة من النظام الشمسي، كان المريخ ينتظر زائرًا مختلفًا تمامًا.",
+      "stations.sojourner.name": "Sojourner",
+      "stations.sojourner.typeLabel": "مركبة جوالة",
+      "stations.sojourner.meta": "1997 — سطح المريخ — مركبة جوالة",
+      "stations.sojourner.story": "في 1997، هبطت Sojourner على المريخ — أول مركبة جوالة تتحرك على سطح كوكب آخر. كانت صغيرة، بحجم ميكروويف تقريبًا، لكنها أثبتت شيئًا كبيرًا: أن السير على المريخ ممكن. فتحت الباب أمام جوالات أكبر وأطول عمرًا. وبعد سبع سنوات فقط، ستصل إلى المريخ جوالة لم يكن أحد يتوقع أن تصمد 15 عامًا.",
+      "stations.opportunity.name": "Opportunity + Pancam",
+      "stations.opportunity.typeLabel": "مركبة جوالة + أداة",
+      "stations.opportunity.meta": "2004-2018 — سطح المريخ — جوالة + أداة علمية",
+      "stations.opportunity.story": "في 2004، أُرسلت Opportunity في مهمة كان يُعتقد أنها ستدوم 90 يومًا. صمدت 15 عامًا. جابت المريخ، واكتشفت أدلة على ماء قديم، وكاميرتها Pancam جعلتنا نرى المريخ بعيوننا. في 2018، حجبت عاصفة رملية الشمس عن ألواحها الشمسية، فنامت ولم تستيقظ — لكنها تركت إرثًا لا يُنسى. وبينما كانت تصمد كل هذه السنوات، كانت مركبة أخرى تحفر في الجليد عند القطب الشمالي للمريخ.",
+      "stations.phoenix.name": "Phoenix",
+      "stations.phoenix.typeLabel": "مركبة هبوط",
+      "stations.phoenix.meta": "2008 — سطح المريخ — مركبة هبوط",
+      "stations.phoenix.story": "في 2008، هبطت Phoenix قرب القطب الشمالي للمريخ. لم تكن تتحرك، لكنها حفرت تحت السطح واكتشفت الماء المتجمد — دليلًا على أن المريخ كان يمكن أن يحتضن الحياة. بعد أشهر، غطاها الشتاء المريخي، فنامت ولم تستيقظ. لكن السؤال عن باطن المريخ لم يُغلق؛ بعد عشر سنوات، ستحاول مركبة أخرى أن تسمعه من الداخل.",
+      "stations.insight.name": "InSight",
+      "stations.insight.typeLabel": "مركبة هبوط",
+      "stations.insight.meta": "2018-2022 — سطح المريخ — مركبة هبوط",
+      "stations.insight.story": "في 2018، هبطت InSight على المريخ لتفعل شيئًا لم يفعله أحد قبله: أن تسمع نبض الكوكب. رصدت زلازل المريخ لأول مرة، ودرست باطنه. بعد أربع سنوات، غطاها الغبار، فنامت — لكنها تركت لنا أول تسجيل لصوت كوكب آخر. أما أجسام الفضاء السحيق، فما زالت تبتعد… وبعضها لم يصل بعد إلى حيث ينتهي النظام الشمسي."
+    },
+
+    en: {
+      "app.title": "The Left-Behind History — Solar System Map",
+      "welcome.title": "The Left-Behind History",
+      "welcome.intro": "An interactive journey through the history of space exploration — from the first soft landing on the Moon (Luna 9, 1966) to the probes still drifting into deep space.",
+      "welcome.howto": "How to use this app?",
+      "welcome.step1": "1. Move the timeline in the top-right corner year by year (starting from 1966).",
+      "welcome.step2": "2. Click the Moon, Mars, or the deep-space arrows to see their map and objects.",
+      "welcome.step3": "3. Click any object to read its story.",
+      "welcome.step4": "4. You cannot advance to a new year with newly launched objects until you have visited every new object in the current year.",
+      "welcome.step5": "5. The hints button on the left provides help.",
+      "welcome.start": "Begin the journey",
+      "timeline.title": "Timeline",
+      "timeline.yearLabel": "YEAR",
+      "timeline.prev": "‹ Previous",
+      "timeline.prevTitle": "Previous year",
+      "timeline.next": "Next ›",
+      "timeline.nextTitle": "Next year",
+      "timeline.progressLabel": "Journey progress",
+      "notes.tooltip": "Hints & help",
+      "notes.title": "Hints & Help",
+      "notes.intro": "Practical tips for a smooth experience:",
+      "notes.item1": "🧭 <b>Move the timeline first:</b> use the “Previous” and “Next” buttons in the top-right corner to navigate between years. The app starts at 1966.",
+      "notes.item2": "🖱️ <b>Open a map:</b> click the Moon, Mars, or the deep-space arrows to view the objects available that year.",
+      "notes.item3": "📍 <b>Open an object:</b> inside the map, click any glowing dot to read its story. A dot with the ● mark hasn't been visited yet.",
+      "notes.item4": "✅ <b>Complete the year:</b> after reading every object in the year, the “Next” button unlocks to move to the new year.",
+      "notes.item5": "↩️ <b>Going back:</b> use the “Back” button at the top of the image to return from the object page to the planet map, then to the Solar System.",
+      "planets.earth": "Earth",
+      "planets.moon": "Moon",
+      "planets.mars": "Mars",
+      "planets.deep": "Deep Space",
+      "planets.deepArrow": "Deep Space →",
+      "planets.deepArrow2": "← Deep Space",
+      "planet.backToSystem": "← Back to Solar System",
+      "planet.mapPlaceholder": "[Map image will be added later]",
+      "planet.titleTemplate": "{name} Map",
+      "planet.subTemplate": "{count} object(s) up to {year}",
+      "planet.empty": "No objects at this location up to this year",
+      "object.back": "← Back",
+      "object.imagePlaceholder": "[Image will be added later]",
+      "object.imagePending": "[Image: {name}] — (to be added later)",
+      "object.metaTypeSuffix": "• {typeLabel}",
+      "yearLock.title": "🔒 Next year is locked",
+      "yearLock.ok": "OK",
+      "yearLock.message": "You must visit the new objects in {year} first:<br><br>{list}<br><br><span style=\"color:#ffcf5c;font-size:.8rem\">💡 Click on the location above to find the object</span>",
+      "yearLock.itemTemplate": "• <b>{name}</b><br><span style=\"color:#8b93a8;font-size:.8rem\">📍 {location}</span>",
+      "yearLock.locationMoon": "{moon} 🌕",
+      "yearLock.locationMars": "{mars} 🔴",
+      "yearLock.locationDeep": "{deep} 🪐",
+      "lang.tooltip": "Change language",
+      "lang.badge": "EN",
+      "lang.switchTo": "العربية",
+      "lang.tooltipSwitch": "Switch to Arabic",
+      "welcomeLang.switchTo": "العربية",
+      "welcomeLang.tooltip": "Switch to Arabic",
+      "sources.tooltip": "Sources",
+      "sources.title": "Sources",
+      "sources.back": "← Back",
+      "sources.introTitle": "Primary source:",
+      "sources.intro": "NASA Data & Resources — NASA Space Science Data Coordinated Archive (NSSDCA)",
+      "sources.introDetail": "The NSSDCA is NASA's definitive, publicly available catalog. Participants can use it to search for any spacecraft or instrument sent into space, retrieve its mission parameters, and learn exactly what its final resting place and operational status is.",
+      "sources.visitNssdca": "Visit the NSSDCA archive →",
+      "sources.linkNssdca": "NSSDCA",
+      "sources.moonTitle": "The Moon",
+      "sources.moon.apolloName": "Apollo Lunar Modules",
+      "sources.moon.apolloDetail": "The descent stages of the Lunar Modules (like Apollo 11's Eagle) were left behind as launch pads.",
+      "sources.moon.lrvName": "Lunar Roving Vehicles (LRVs)",
+      "sources.moon.lrvDetail": "Three electric \"moon buggies\" driven by astronauts. Parked permanently on the Moon.",
+      "sources.moon.alsepName": "ALSEP Scientific Packages",
+      "sources.moon.alsepDetail": "Apollo Lunar Surface Experiments Packages (seismometers, retroreflectors, etc.) left to do science after astronauts departed.",
+      "sources.moon.surveyorName": "Surveyor Landers",
+      "sources.moon.surveyorDetail": "Robotic probes sent in the 1960s to prove soft landings were possible.",
+      "sources.marsTitle": "Mars",
+      "sources.mars.sojournerName": "Sojourner Rover",
+      "sources.mars.sojournerDetail": "The first rover on Mars (1997), delivered by the Pathfinder lander. Now permanently parked.",
+      "sources.mars.spiritOppName": "Spirit & Opportunity",
+      "sources.mars.spiritOppDetail": "Twin rovers that operated for years. Both are now inactive monuments to Mars exploration.",
+      "sources.mars.vikingName": "Viking 1 & 2 Landers",
+      "sources.mars.vikingDetail": "The first U.S. landers to successfully operate on Mars (1976), remaining exactly where they touched down.",
+      "sources.mars.phoenixInSightName": "Phoenix & InSight Landers",
+      "sources.mars.phoenixInSightDetail": "Phoenix dug for water ice; InSight listened for marsquakes. Both eventually lost power.",
+      "sources.mars.ingenuityName": "Ingenuity Helicopter",
+      "sources.mars.ingenuityDetail": "The first aircraft on another planet. Sustained rotor damage and became a stationary artifact.",
+      "sources.deepTitle": "Deep Space",
+      "sources.deep.pioneerName": "Pioneer 10 & 11",
+      "sources.deep.pioneerDetail": "Early deep-space probes that explored the outer planets. Now drifting silently out of the solar system.",
+      "sources.deep.dawnName": "Dawn Spacecraft",
+      "sources.deep.dawnDetail": "Mapped Vesta and Ceres. Ran out of fuel and remains in a perpetual, unpowered orbit around Ceres.",
+      "sources.deep.nearName": "NEAR Shoemaker",
+      "sources.deep.nearDetail": "First spacecraft to orbit and land on an asteroid. Left resting on the surface of 433 Eros.",
+      "sources.deep.keplerName": "Kepler Space Telescope",
+      "sources.deep.keplerDetail": "Revolutionary exoplanet-hunting telescope that ran out of fuel and is drifting in an Earth-trailing orbit.",
+      "stations.luna9.name": "Luna 9",
+      "stations.luna9.typeLabel": "Lander",
+      "stations.luna9.meta": "February 1966 — Lunar surface — Lander",
+      "stations.luna9.story": "In February 1966, the Soviet Luna 9 touched down softly on the Moon — the first time in history a human-made object successfully landed on another world without crashing. It was stationary, but it transmitted the first images from the lunar surface and proved that a soft landing was possible. Three years before humans walked on the Moon, Luna 9 had already paved the way. But who will take the step Luna 9 could not: to move a human across that surface?",
+      "stations.apollo11.name": "Apollo 11 Descent Stage",
+      "stations.apollo11.typeLabel": "Descent stage",
+      "stations.apollo11.meta": "1969 — Lunar surface — Descent stage",
+      "stations.apollo11.story": "In July 1969, Apollo 11 landed on the Moon. After the two astronauts completed their mission and returned to Earth, the Descent Stage was left behind — the first human trace on the lunar surface. It wasn't just a piece of metal; it was the beginning: the first time humanity left its equipment on another world. But departure was not the end of the work; some of what was left behind was never meant to fall silent.",
+      "stations.alsep.name": "ALSEP — Apollo Lunar Experiments",
+      "stations.alsep.typeLabel": "Scientific instrument",
+      "stations.alsep.meta": "1969-1972 — Lunar surface — Scientific instrument",
+      "stations.alsep.story": "After the astronauts departed, the instruments kept working. The Apollo Lunar Surface Experiments Package (ALSEP) was a suite of scientific devices left on the Moon to monitor moonquakes, the solar wind, and the magnetic field. It kept operating for years after the humans left, silently transmitting data to Earth — the first permanent scientific laboratory on another world. And yet, another world was waiting for someone to reach it… millions of kilometers away.",
+      "stations.pioneer10.name": "Pioneer 10",
+      "stations.pioneer10.typeLabel": "Probe",
+      "stations.pioneer10.meta": "1972 — Deep space — Probe",
+      "stations.pioneer10.story": "In 1972, Pioneer 10 was launched as the first probe to cross the asteroid belt and head into deep space. It was a trailblazer, the first to send back close-up images of Jupiter. After contact was lost, it kept drifting through space — silent, but the first to open the door for the probes that followed. A few years later, another probe would follow the same path, but it would not stop at Jupiter.",
+      "stations.viking1.name": "Viking 1",
+      "stations.viking1.typeLabel": "Lander",
+      "stations.viking1.meta": "1976 — Martian surface — Lander",
+      "stations.viking1.story": "In 1976, Viking 1 landed on Mars — the first successful landing on another planet. It stayed fixed in place, taking images and running experiments. It proved that landing was possible and that Mars could be studied up close. But it never moved — it was waiting for whoever came next to roam the surface. And that wait was not as long as some expected.",
+      "stations.voyager1.name": "Voyager 1",
+      "stations.voyager1.typeLabel": "Probe",
+      "stations.voyager1.meta": "1977 — Deep space — Probe",
+      "stations.voyager1.story": "In 1977, Voyager 1 was launched on a journey no one expected to last decades. It flew past Jupiter and Saturn, then crossed the boundary of the Solar System itself — the first human-made object to enter interstellar space. There is no plan to bring it back. It is still drifting away, carrying a message from humanity to the unknown. And on the opposite side of the Solar System, Mars was waiting for a very different visitor.",
+      "stations.sojourner.name": "Sojourner",
+      "stations.sojourner.typeLabel": "Rover",
+      "stations.sojourner.meta": "1997 — Martian surface — Rover",
+      "stations.sojourner.story": "In 1997, Sojourner landed on Mars — the first rover to move across the surface of another planet. It was small, about the size of a microwave, but it proved something big: that driving on Mars was possible. It opened the door for larger, longer-lived rovers. And just seven years later, a rover would arrive on Mars that no one expected to last 15 years.",
+      "stations.opportunity.name": "Opportunity + Pancam",
+      "stations.opportunity.typeLabel": "Rover + instrument",
+      "stations.opportunity.meta": "2004-2018 — Martian surface — Rover + scientific instrument",
+      "stations.opportunity.story": "In 2004, Opportunity was sent on a mission expected to last 90 days. It endured for 15 years. It roamed Mars, found evidence of ancient water, and its Pancam camera let us see Mars through our own eyes. In 2018, a dust storm blocked the Sun from its solar panels, and it went to sleep and never woke up — but it left an unforgettable legacy. And while it endured all those years, another spacecraft was digging into the ice at Mars' north pole.",
+      "stations.phoenix.name": "Phoenix",
+      "stations.phoenix.typeLabel": "Lander",
+      "stations.phoenix.meta": "2008 — Martian surface — Lander",
+      "stations.phoenix.story": "In 2008, Phoenix landed near Mars' north pole. It couldn't move, but it dug beneath the surface and discovered frozen water — evidence that Mars could once have harbored life. A few months later, the Martian winter covered it, and it went to sleep and never woke up. But the question of Mars' interior was not closed; ten years later, another spacecraft would try to hear it from within.",
+      "stations.insight.name": "InSight",
+      "stations.insight.typeLabel": "Lander",
+      "stations.insight.meta": "2018-2022 — Martian surface — Lander",
+      "stations.insight.story": "In 2018, InSight landed on Mars to do something no one had done before: listen to the heartbeat of a planet. It detected Martian quakes for the first time and studied the planet's interior. Four years later, dust covered it, and it went to sleep — but it left us the first recording of the sound of another world. As for the deep-space objects, they are still drifting away… and some have not yet reached where the Solar System ends."
+    }
+  },
+
+  load(lang) {
+    if (!this.DICTS[lang]) {
+      console.warn('Language not available:', lang);
+      return false;
+    }
+    this.current = lang;
+    this.dict = this.DICTS[lang];
+    this.apply();
+    return true;
+  },
+
+  t(key, params) {
+    let str = this.dict[key] ?? key;
+    if (params) {
+      for (const k in params) {
+        str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
+      }
+    }
+    return str;
+  },
+
+  apply() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      const val = this.t(key);
+      if (val !== key) el.textContent = val;
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const key = el.dataset.i18nHtml;
+      const val = this.t(key);
+      if (val !== key) el.innerHTML = val;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const key = el.dataset.i18nTitle;
+      const val = this.t(key);
+      if (val !== key) el.setAttribute('title', val);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.dataset.i18nPlaceholder;
+      const val = this.t(key);
+      if (val !== key) el.setAttribute('placeholder', val);
+    });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      const key = el.dataset.i18nAriaLabel;
+      const val = this.t(key);
+      if (val !== key) el.setAttribute('aria-label', val);
+    });
+
+    document.documentElement.lang = this.current;
+    document.documentElement.dir = this.current === 'ar' ? 'rtl' : 'ltr';
+
+    const badge = document.getElementById('lang-badge');
+    if (badge) badge.textContent = this.t('lang.badge');
+
+    const langBtn = document.getElementById('lang-toggle');
+    if (langBtn) langBtn.setAttribute('title', this.t('lang.tooltipSwitch'));
+
+    const wlLabel = document.getElementById('welcome-lang-label');
+    if (wlLabel) wlLabel.textContent = this.t('welcomeLang.switchTo');
+    const wlBtn = document.getElementById('welcome-lang');
+    if (wlBtn) wlBtn.setAttribute('title', this.t('welcomeLang.tooltip'));
+  },
+
+  setLang(lang) {
+    if (!this.load(lang)) return;
+    try {
+      localStorage.setItem('app_lang', lang);
+    } catch(e) {}
+  }
+};
+
+/* ====================================================================
+   بيانات المحطات — مع حقل image لأسماء الصور
+   ==================================================================== */
+const STATIONS = [
+  { id:"luna9",       year:1966, type:"lander",     location:"moon", color:"#c0c8d8", image:"luna9.png" },
+  { id:"apollo11",    year:1969, type:"descent",    location:"moon", color:"#ffcf5c", image:"apollo11.png" },
+  { id:"alsep",       year:1969, type:"instrument", location:"moon", color:"#5fe0a0", image:"alsep.png" },
+  { id:"pioneer10",   year:1972, type:"probe",      location:"deep", color:"#4da3ff", image:"pioneer10.png" },
+  { id:"viking1",     year:1976, type:"lander",     location:"mars", color:"#ff8a5c", image:"viking1.png" },
+  { id:"voyager1",    year:1977, type:"probe",      location:"deep", color:"#7c5cff", image:"voyager1.png" },
+  { id:"sojourner",   year:1997, type:"rover",      location:"mars", color:"#5fe0a0", image:"sojourner.png" },
+  { id:"opportunity", year:2004, type:"rover",      location:"mars", color:"#ffcf5c", image:"opportunity.png" },
+  { id:"phoenix",     year:2008, type:"lander",     location:"mars", color:"#4da3ff", image:"phoenix.png" },
+  { id:"insight",     year:2018, type:"lander",     location:"mars", color:"#7c5cff", image:"insight.png" }
+];
+
+/* خرائط الكواكب المتوقعة كخلفية — الفضاء السحيق بدون خريطة (يبقى بتصميم الخلفية) */
+const PLANET_MAPS = {
+  moon: "moon_map.png",
+  mars: "mars_map.png"
+  // deep: لا خريطة — يبقى بتصميم الخلفية الفضائية
+};
+
+function getStationText(st, field) {
+  return I18N.t('stations.' + st.id + '.' + field);
+}
+
+function checkTranslations() {
+  const arKeys = Object.keys(I18N.DICTS.ar).sort();
+  const enKeys = Object.keys(I18N.DICTS.en).sort();
+  const missingInEn = arKeys.filter(k => !enKeys.includes(k));
+  const missingInAr = enKeys.filter(k => !arKeys.includes(k));
+  if (missingInEn.length === 0 && missingInAr.length === 0) {
+    console.log('%c✅ All translations complete (' + arKeys.length + ' keys per language)',
+                'color:#5fe0a0;font-weight:bold');
+  } else {
+    if (missingInEn.length) console.warn('%c⚠️ Missing in EN', 'color:#ffcf5c;font-weight:bold', missingInEn);
+    if (missingInAr.length) console.warn('%c⚠️ Missing in AR', 'color:#ffcf5c;font-weight:bold', missingInAr);
+  }
+}
+
+/* ====================================================================
+   الحالة العامة
+   ==================================================================== */
+const START_YEAR = 1966;
+const END_YEAR = 2018;
+let currentYear = START_YEAR;
+let visited = new Set();
+let currentObjectId = null;
+let currentPlanetLocation = null;
+
+function startApp(){
+  document.getElementById('welcome').style.display = 'none';
+  document.getElementById('welcome-lang').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  generateStars();
+  bindMapClickables();
+  updateTimelineUI();
+  startOrbits();
+}
+
+function generateStars(){
+  const container = document.getElementById('stars');
+  let html = '';
+  for(let i = 0; i < 140; i++){
+    const size = Math.random() * 2 + 0.5;
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const delay = Math.random() * 4;
+    const dur = 2 + Math.random() * 3;
+    html += `<div class="star" style="
+      width:${size}px;height:${size}px;
+      left:${x}%;top:${y}%;
+      animation-delay:${delay}s;animation-duration:${dur}s;
+      opacity:${Math.random() * 0.6 + 0.2};
+    "></div>`;
+  }
+  container.innerHTML = html;
+}
+
+/* ====================================================================
+   حركة المدارات — تحرّك .planet-icon-wrap (الإيموجي)
+   ملاحظة: تم تخفيض سرعات المدارات إلى النصف
+   ==================================================================== */
+const SUN = { cx: 500, cy: 350 };
+const earthOrbit = { angle: Math.atan2(290 - SUN.cy, 620 - SUN.cx), r: 180, speed: 0.00125 };
+const marsOrbit  = { angle: Math.atan2(470 - SUN.cy, 330 - SUN.cx), r: 280, speed: 0.00075 };
+const moonOrbit  = { angle: Math.atan2(330 - 290, 668 - 620), r: 62,  speed: 0.003 };
+let earthPos = { x: SUN.cx + Math.cos(earthOrbit.angle) * earthOrbit.r,
+                 y: SUN.cy + Math.sin(earthOrbit.angle) * earthOrbit.r };
+
+function startOrbits(){ requestAnimationFrame(animateOrbits); }
+
+function animateOrbits(){
+  const svg = document.querySelector('#map svg');
+  if(!svg) return;
+  const earthGroup = svg.querySelector('.orbit-earth');
+  const moonGroup  = svg.querySelector('.clickable-body.orbit-moon');
+  const marsGroup  = svg.querySelector('.clickable-body.orbit-mars');
+
+  earthOrbit.angle += earthOrbit.speed;
+  const earthX = SUN.cx + Math.cos(earthOrbit.angle) * earthOrbit.r;
+  const earthY = SUN.cy + Math.sin(earthOrbit.angle) * earthOrbit.r;
+  earthPos = { x: earthX, y: earthY };
+  if(earthGroup){
+    const wrap = earthGroup.querySelector('.planet-icon-wrap');
+    if(wrap) wrap.setAttribute('transform', `translate(${earthX}, ${earthY})`);
+    const earthLabel = earthGroup.querySelector('text.planet-label');
+    if(earthLabel){ earthLabel.setAttribute('x', earthX); earthLabel.setAttribute('y', earthY + 38); }
+  }
+
+  moonOrbit.angle += moonOrbit.speed;
+  const moonX = earthPos.x + Math.cos(moonOrbit.angle) * moonOrbit.r;
+  const moonY = earthPos.y + Math.sin(moonOrbit.angle) * moonOrbit.r;
+  if(moonGroup){
+    const wrap = moonGroup.querySelector('.planet-icon-wrap');
+    if(wrap) wrap.setAttribute('transform', `translate(${moonX}, ${moonY})`);
+    const moonLabel = moonGroup.querySelector('text.planet-sub');
+    if(moonLabel){ moonLabel.setAttribute('x', moonX); moonLabel.setAttribute('y', moonY + 28); }
+  }
+
+  marsOrbit.angle += marsOrbit.speed;
+  const marsX = SUN.cx + Math.cos(marsOrbit.angle) * marsOrbit.r;
+  const marsY = SUN.cy + Math.sin(marsOrbit.angle) * marsOrbit.r;
+  if(marsGroup){
+    const wrap = marsGroup.querySelector('.planet-icon-wrap');
+    if(wrap) wrap.setAttribute('transform', `translate(${marsX}, ${marsY})`);
+    const marsLabel = marsGroup.querySelector('text.planet-label');
+    if(marsLabel){ marsLabel.setAttribute('x', marsX); marsLabel.setAttribute('y', marsY + 40); }
+  }
+
+  requestAnimationFrame(animateOrbits);
+}
+
+/* ====================================================================
+   ربط النقر ولوحة المفاتيح
+   ==================================================================== */
+function bindMapClickables(){
+  const handleActivate = (el) => {
+    const nameKey = el.dataset.nameKey;
+    const name = nameKey ? I18N.t(nameKey) : el.dataset.name;
+    openPlanetPage(el.dataset.location, name);
+  };
+  document.querySelectorAll('.clickable-body').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); handleActivate(el); });
+    el.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleActivate(el); }
+    });
+  });
+  document.querySelectorAll('.deep-space-arrow').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPlanetPage('deep', I18N.t('planets.deep'));
+    });
+    el.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        openPlanetPage('deep', I18N.t('planets.deep'));
+      }
+    });
+  });
+}
+
+/* ====================================================================
+   الأجندة الزمنية
+   ==================================================================== */
+function changeYear(delta){
+  if(delta > 0){
+    const unvisited = getUnvisitedInYear(currentYear);
+    if(unvisited.length > 0){ showYearLock(unvisited); return; }
+  }
+  const newYear = currentYear + delta;
+  if(newYear < START_YEAR || newYear > END_YEAR) return;
+  currentYear = newYear;
+  updateTimelineUI();
+}
+
+function updateTimelineUI(){
+  document.getElementById('year-display').textContent = currentYear;
+  const pct = ((currentYear - START_YEAR) / (END_YEAR - START_YEAR)) * 100;
+  document.getElementById('year-progress').style.width = pct + '%';
+  document.getElementById('year-prev').disabled = currentYear <= START_YEAR;
+  document.getElementById('year-next').disabled = currentYear >= END_YEAR;
+}
+
+function getUnvisitedInYear(year){
+  return STATIONS.filter(st => st.year === year && !visited.has(st.id));
+}
+
+function showYearLock(unvisited){
+  const toast = document.getElementById('year-lock-toast');
+  const msg = document.getElementById('year-lock-msg');
+  const locationNames = {
+    moon: I18N.t('yearLock.locationMoon', { moon: I18N.t('planets.moon') }),
+    mars: I18N.t('yearLock.locationMars', { mars: I18N.t('planets.mars') }),
+    deep: I18N.t('yearLock.locationDeep', { deep: I18N.t('planets.deep') })
+  };
+  const list = unvisited.map(st => {
+    const loc = locationNames[st.location] || st.location;
+    return I18N.t('yearLock.itemTemplate', { name: getStationText(st, 'name'), location: loc });
+  }).join('<br><br>');
+  msg.innerHTML = I18N.t('yearLock.message', { year: currentYear, list });
+  toast.classList.add('open');
+}
+
+function closeYearLock(){
+  document.getElementById('year-lock-toast').classList.remove('open');
+}
+
+/* ====================================================================
+   صفحة الكوكب — مع تحميل خريطة الخلفية إن وجدت
+   ==================================================================== */
+function openPlanetPage(location, name){
+  currentPlanetLocation = location;
+  document.getElementById('pp-title').textContent = I18N.t('planet.titleTemplate', { name });
+
+  const objectsHere = STATIONS.filter(st =>
+    st.location === location && currentYear >= st.year
+  );
+
+  const sub = document.getElementById('pp-sub');
+  sub.textContent = I18N.t('planet.subTemplate', { count: objectsHere.length, year: currentYear });
+
+  const mapArea = document.getElementById('pp-map-area');
+  const mapFile = PLANET_MAPS[location];
+  if(mapFile){
+    mapArea.style.backgroundImage = `url('${mapFile}')`;
+    mapArea.classList.add('has-map');
+  } else {
+    mapArea.style.backgroundImage = '';
+    mapArea.classList.remove('has-map');
+  }
+
+  const layer = document.getElementById('planet-objects-layer');
+  layer.innerHTML = '';
+
+  if(objectsHere.length === 0){
+    layer.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b93a8;font-size:.9rem;z-index:1;">${I18N.t('planet.empty')}</div>`;
+  } else {
+    objectsHere.forEach((st, idx) => {
+      const angle = (idx / objectsHere.length) * Math.PI * 2;
+      const radiusX = 30, radiusY = 25;
+      const leftPct = 50 + Math.cos(angle) * radiusX;
+      const topPct = 50 + Math.sin(angle) * radiusY;
+
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'planet-object' + (visited.has(st.id) ? ' visited' : ' unvisited');
+      el.style.left = leftPct + '%';
+      el.style.top = topPct + '%';
+      el.style.color = st.color;
+
+      el.innerHTML = `
+        <div class="p-dot" style="background:${st.color}"></div>
+        <div class="p-label">${getStationText(st, 'name')}</div>
+      `;
+      el.addEventListener('click', () => openObjectPage(st.id));
+      layer.appendChild(el);
+    });
+  }
+
+  document.getElementById('planet-page').classList.add('open');
+}
+
+function closePlanetPage(){
+  document.getElementById('planet-page').classList.remove('open');
+  currentPlanetLocation = null;
+}
+
+/* ====================================================================
+   صفحة الجسم — تحميل الصورة من الاسم المتوقع
+   ==================================================================== */
+function openObjectPage(id){
+  const st = STATIONS.find(s => s.id === id);
+  if(!st) return;
+  currentObjectId = id;
+  currentPlanetLocation = st.location;
+  visited.add(id);
+
+  const hero = document.getElementById('op-hero');
+  const oldImg = hero.querySelector('img');
+  if(oldImg) oldImg.remove();
+
+  let placeholder = document.getElementById('op-image');
+  if(st.image){
+    if(placeholder) placeholder.remove();
+    const img = document.createElement('img');
+    img.src = st.image;
+    img.alt = getStationText(st, 'name');
+    img.onerror = function(){
+      /* إذا لم توجد الصورة، أظهر النص البديل */
+      this.remove();
+      const ph = document.createElement('div');
+      ph.id = 'op-image';
+      ph.className = 'hero-placeholder';
+      ph.textContent = I18N.t('object.imagePending', { name: getStationText(st, 'name') });
+      hero.appendChild(ph);
+    };
+    hero.appendChild(img);
+  } else {
+    if(!placeholder){
+      placeholder = document.createElement('div');
+      placeholder.id = 'op-image';
+      placeholder.className = 'hero-placeholder';
+      hero.appendChild(placeholder);
+    }
+    placeholder.className = 'hero-placeholder';
+    placeholder.textContent = I18N.t('object.imagePending', { name: getStationText(st, 'name') });
+  }
+
+  document.getElementById('op-title').textContent = getStationText(st, 'name');
+  document.getElementById('op-meta').innerHTML =
+    `${getStationText(st, 'meta')} <span style="color:var(--gold);margin-inline-start:8px;">${I18N.t('object.metaTypeSuffix', { typeLabel: getStationText(st, 'typeLabel') })}</span>`;
+  document.getElementById('op-story').innerHTML = `<div>${getStationText(st, 'story')}</div>`;
+
+  document.getElementById('object-page').classList.add('open');
+  document.getElementById('object-page').scrollTop = 0;
+}
+
+function closeObjectPage(){
+  document.getElementById('object-page').classList.remove('open');
+  currentObjectId = null;
+  if(currentPlanetLocation){
+    openPlanetPage(currentPlanetLocation, I18N.t('planets.' + currentPlanetLocation));
+  }
+}
+
+/* ====================================================================
+   صفحة المصادر
+   ==================================================================== */
+function openSourcesPage(){
+  document.getElementById('sources-page').classList.add('open');
+}
+function closeSourcesPage(){
+  document.getElementById('sources-page').classList.remove('open');
+}
+
+/* ====================================================================
+   زر التلميحات
+   ==================================================================== */
+function toggleNotes(){
+  document.getElementById('notes-panel').classList.toggle('open');
+}
+
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notes-panel');
+  const btn   = document.getElementById('notes-toggle');
+  if(!panel || !panel.classList.contains('open')) return;
+  if(panel.contains(e.target) || btn.contains(e.target)) return;
+  panel.classList.remove('open');
+});
+
+/* ====================================================================
+   تبديل اللغة
+   ==================================================================== */
+function toggleLanguage(){
+  const scrollBefore = document.getElementById('object-page').scrollTop;
+  const objectOpen   = document.getElementById('object-page').classList.contains('open');
+
+  const next = I18N.current === 'ar' ? 'en' : 'ar';
+  I18N.setLang(next);
+  updateTimelineUI();
+
+  if(currentPlanetLocation && document.getElementById('planet-page').classList.contains('open')){
+    openPlanetPage(currentPlanetLocation, I18N.t('planets.' + currentPlanetLocation));
+  }
+
+  if(currentObjectId && objectOpen){
+    const st = STATIONS.find(s => s.id === currentObjectId);
+    if(st){
+      document.getElementById('op-title').textContent = getStationText(st, 'name');
+      document.getElementById('op-meta').innerHTML =
+        `${getStationText(st, 'meta')} <span style="color:var(--gold);margin-inline-start:8px;">${I18N.t('object.metaTypeSuffix', { typeLabel: getStationText(st, 'typeLabel') })}</span>`;
+      document.getElementById('op-story').innerHTML = `<div>${getStationText(st, 'story')}</div>`;
+      document.getElementById('object-page').scrollTop = scrollBefore;
+    }
+  }
+
+  if(document.getElementById('year-lock-toast').classList.contains('open')){
+    const unvisited = getUnvisitedInYear(currentYear);
+    if(unvisited.length > 0) showYearLock(unvisited);
+  }
+}
+
+/* ====================================================================
+   التهيئة
+   ==================================================================== */
+(function init(){
+  let saved = 'ar';
+  try { saved = localStorage.getItem('app_lang') || 'ar'; } catch(e) {}
+  I18N.load(saved === 'en' ? 'en' : 'ar');
+  checkTranslations();
+})();
+</script>
+</body>
+</html>
